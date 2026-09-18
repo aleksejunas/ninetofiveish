@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ninetofiveish</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ninetofiveish">
+<meta name="theme-color" content="#2563eb">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>ninetofiveish</h1>
+
+  <div class="card summary" id="summary">
+    <div><div class="num" id="sumMonth">0</div><div class="lbl">timer denne mnd.</div></div>
+    <div><div class="num" id="sumWeek">0</div><div class="lbl">timer denne uke</div></div>
+    <div><div class="num" id="sumCount">0</div><div class="lbl">vakter totalt</div></div>
+  </div>
+
+  <div class="card">
+    <div class="mode-toggle">
+      <button type="button" class="mode-btn active" id="modeSingleBtn">Enkelt</button>
+      <button type="button" class="mode-btn" id="modeBatchBtn">Uke</button>
+    </div>
+
+    <form id="entryForm">
+      <div class="row">
+        <div class="field">
+          <label for="date">Dato</label>
+          <input type="date" id="date" required>
+        </div>
+        <div class="field">
+          <label for="hours">Timer</label>
+          <input type="number" id="hours" step="0.25" min="0" max="24" placeholder="3.5" required inputmode="decimal">
+        </div>
+      </div>
+      <div class="field">
+        <label for="note">Notat (valgfritt)</label>
+        <input type="text" id="note" placeholder="f.eks. Seterbråten">
+      </div>
+      <button type="submit" class="btn-primary" id="submitBtn">Legg til</button>
+    </form>
+
+    <div id="batchView" style="display:none;">
+      <div class="week-nav">
+        <button type="button" id="prevWeekBtn" aria-label="Forrige uke">‹</button>
+        <div class="wk-label" id="weekLabel"></div>
+        <button type="button" id="nextWeekBtn" aria-label="Neste uke">›</button>
+      </div>
+      <div id="weekRows"></div>
+      <div class="week-total"><span>Sum uken</span><span id="weekTotal">0 t</span></div>
+      <button type="button" class="btn-primary" id="saveWeekBtn" style="width:100%;">Lagre uke</button>
+    </div>
+  </div>
+
+  <div id="list"></div>
+
+  <div class="footer-actions">
+    <button class="btn-ghost" id="exportBtn">Eksporter CSV</button>
+  </div>
+</div>
+<script src="app.js"></script>
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(err => console.error("SW-registrering feilet:", err));
+  });
+}
+</script>
+</body>
+</html>
