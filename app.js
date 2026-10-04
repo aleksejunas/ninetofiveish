@@ -1,6 +1,19 @@
-const STORAGE_KEY = "aks-timer-entries";
-const WEEKDAYS = ["søn","man","tir","ons","tor","fre","lør"];
-const MONTHS = ["januar","februar","mars","april","mai","juni","juli","august","september","oktober","november","desember"];
+const STORAGE_KEY = "ninetofiveish-entries";
+const WEEKDAYS = ["søn", "man", "tir", "ons", "tor", "fre", "lør"];
+const MONTHS = [
+  "januar",
+  "februar",
+  "mars",
+  "april",
+  "mai",
+  "juni",
+  "juli",
+  "august",
+  "september",
+  "oktober",
+  "november",
+  "desember",
+];
 
 let entries = load();
 let editingNoteId = null;
@@ -9,11 +22,16 @@ function load() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 }
 function save() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); }
-  catch (e) { console.error("Kunne ikke lagre:", e); }
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+  } catch (e) {
+    console.error("Kunne ikke lagre:", e);
+  }
 }
 
 function todayStr() {
@@ -26,13 +44,15 @@ function isoWeek(dateStr) {
   const d = new Date(dateStr + "T00:00:00");
   d.setDate(d.getDate() + 4 - (d.getDay() || 7));
   const yearStart = new Date(d.getFullYear(), 0, 1);
-  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7) + "-" + d.getFullYear();
+  return (
+    Math.ceil(((d - yearStart) / 86400000 + 1) / 7) + "-" + d.getFullYear()
+  );
 }
 function isoWeekNumber(dateStr) {
   const d = new Date(dateStr + "T00:00:00");
   d.setDate(d.getDate() + 4 - (d.getDay() || 7));
   const yearStart = new Date(d.getFullYear(), 0, 1);
-  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
 }
 function toDateStr(d) {
   const off = d.getTimezoneOffset();
@@ -63,8 +83,12 @@ function render() {
   const today = todayStr();
   const curMonth = today.slice(0, 7);
   const curWeek = isoWeek(today);
-  const sumMonth = sorted.filter(e => e.date.slice(0,7) === curMonth).reduce((s,e) => s + e.hours, 0);
-  const sumWeek = sorted.filter(e => isoWeek(e.date) === curWeek).reduce((s,e) => s + e.hours, 0);
+  const sumMonth = sorted
+    .filter((e) => e.date.slice(0, 7) === curMonth)
+    .reduce((s, e) => s + e.hours, 0);
+  const sumWeek = sorted
+    .filter((e) => isoWeek(e.date) === curWeek)
+    .reduce((s, e) => s + e.hours, 0);
   document.getElementById("sumMonth").textContent = fmt(sumMonth);
   document.getElementById("sumWeek").textContent = fmt(sumWeek);
   document.getElementById("sumCount").textContent = entries.length;
@@ -91,20 +115,21 @@ function render() {
 
   for (const g of groups) {
     const [y, m] = g.key.split("-");
-    html += `<div class="month-title"><span>${MONTHS[parseInt(m,10)-1]} ${y}</span><span>${fmt(g.sum)} t</span></div>`;
+    html += `<div class="month-title"><span>${MONTHS[parseInt(m, 10) - 1]} ${y}</span><span>${fmt(g.sum)} t</span></div>`;
     html += '<div class="card" style="padding:0;">';
     for (const e of g.items) {
       const d = new Date(e.date + "T00:00:00");
-      const noteHtml = e.id === editingNoteId
-        ? `<input type="text" class="note-input" data-id="${e.id}" value="${escapeHtml(e.note || "")}" placeholder="Navn" autofocus>`
-        : e.note
-          ? `<button type="button" class="note note-set" data-id="${e.id}">${escapeHtml(e.note)}</button>`
-          : `<button type="button" class="note note-empty" data-id="${e.id}">+ navn</button>`;
+      const noteHtml =
+        e.id === editingNoteId
+          ? `<input type="text" class="note-input" data-id="${e.id}" value="${escapeHtml(e.note || "")}" placeholder="Navn" autofocus>`
+          : e.note
+            ? `<button type="button" class="note note-set" data-id="${e.id}">${escapeHtml(e.note)}</button>`
+            : `<button type="button" class="note note-empty" data-id="${e.id}">+ navn</button>`;
       html += `
         <div class="entry">
           <div class="date">
             <div class="wd">${WEEKDAYS[d.getDay()]}</div>
-            <div class="dm">${d.getDate()}.${d.getMonth()+1}</div>
+            <div class="dm">${d.getDate()}.${d.getMonth() + 1}</div>
           </div>
           ${noteHtml}
           <div class="hours">${fmt(e.hours)} t</div>
@@ -115,15 +140,17 @@ function render() {
   }
   list.innerHTML = html;
 
-  list.querySelectorAll(".del").forEach(btn => {
+  list.querySelectorAll(".del").forEach((btn) => {
     btn.addEventListener("click", () => {
-      entries = entries.filter(e => e.id !== btn.dataset.id);
+      const before = entries;
+      entries = entries.filter((e) => e.id !== btn.dataset.id);
       save();
       render();
+      showUndo("Oppføring slettet", before);
     });
   });
 
-  list.querySelectorAll(".note-set, .note-empty").forEach(btn => {
+  list.querySelectorAll(".note-set, .note-empty").forEach((btn) => {
     btn.addEventListener("click", () => {
       editingNoteId = btn.dataset.id;
       render();
@@ -135,7 +162,7 @@ function render() {
     noteInput.focus();
     noteInput.setSelectionRange(noteInput.value.length, noteInput.value.length);
     const commit = () => {
-      const entry = entries.find(e => e.id === noteInput.dataset.id);
+      const entry = entries.find((e) => e.id === noteInput.dataset.id);
       if (entry) entry.note = noteInput.value.trim();
       editingNoteId = null;
       save();
@@ -143,8 +170,14 @@ function render() {
     };
     noteInput.addEventListener("blur", commit);
     noteInput.addEventListener("keydown", (ev) => {
-      if (ev.key === "Enter") { ev.preventDefault(); noteInput.blur(); }
-      if (ev.key === "Escape") { editingNoteId = null; render(); }
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        noteInput.blur();
+      }
+      if (ev.key === "Escape") {
+        editingNoteId = null;
+        render();
+      }
     });
   }
 }
@@ -157,6 +190,31 @@ function escapeHtml(s) {
   d.textContent = s;
   return d.innerHTML;
 }
+
+let undoState = null;
+let undoTimer = null;
+
+function showUndo(message, snapshot) {
+  undoState = snapshot;
+  document.getElementById("toastMsg").textContent = message;
+  document.getElementById("toast").hidden = false;
+  clearTimeout(undoTimer);
+  undoTimer = setTimeout(hideUndo, 6000);
+}
+function hideUndo() {
+  undoState = null;
+  document.getElementById("toast").hidden = true;
+}
+document.getElementById("toastUndo").addEventListener("click", () => {
+  if (undoState) {
+    entries = undoState;
+    entries = undoState;
+    save();
+    render();
+    renderBatch();
+  }
+  hideUndo();
+});
 
 document.getElementById("date").value = todayStr();
 
@@ -181,13 +239,13 @@ document.getElementById("exportBtn").addEventListener("click", () => {
   const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date));
   let csv = "Dato;Timer;Notat\n";
   for (const e of sorted) {
-    csv += `${e.date};${fmt(e.hours)};${(e.note||"").replace(/;/g, ",")}\n`;
+    csv += `${e.date};${fmt(e.hours)};${(e.note || "").replace(/;/g, ",")}\n`;
   }
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "aks-timer.csv";
+  a.download = "ninetofiveish.csv";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -198,43 +256,51 @@ document.getElementById("exportBtn").addEventListener("click", () => {
 let currentWeekStart = getMonday(todayStr());
 
 function entriesForDate(dateStr) {
-  return entries.filter(e => e.date === dateStr);
+  return entries.filter((e) => e.date === dateStr);
 }
 
 function renderBatch() {
-  const weekDates = Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i));
+  const weekDates = Array.from({ length: 7 }, (_, i) =>
+    addDays(currentWeekStart, i),
+  );
   const wn = isoWeekNumber(currentWeekStart);
   document.getElementById("weekLabel").textContent =
     `Uke ${wn} · ${shortDate(weekDates[0])}–${shortDate(weekDates[6])}`;
 
   const today = todayStr();
   const rows = document.getElementById("weekRows");
-  rows.innerHTML = weekDates.map(date => {
-    const existing = entriesForDate(date);
-    const sum = existing.reduce((s, e) => s + e.hours, 0);
-    const d = new Date(date + "T00:00:00");
-    return `
+  rows.innerHTML = weekDates
+    .map((date) => {
+      const existing = entriesForDate(date);
+      const sum = existing.reduce((s, e) => s + e.hours, 0);
+      const d = new Date(date + "T00:00:00");
+      return `
       <div class="week-row${date === today ? " is-today" : ""}" data-date="${date}">
         <div class="wr-date">
           <div class="wd">${WEEKDAYS[d.getDay()]}</div>
-          <div class="dm">${d.getDate()}.${d.getMonth()+1}</div>
+          <div class="dm">${d.getDate()}.${d.getMonth() + 1}</div>
         </div>
         <input type="number" class="wr-hours" step="0.25" min="0" max="24" inputmode="decimal"
                placeholder="–" value="${sum > 0 ? fmt(sum).replace(",", ".") : ""}">
         <button type="button" class="wr-clear" data-date="${date}" aria-label="Fjern">✕</button>
       </div>`;
-  }).join("");
+    })
+    .join("");
 
-  const weekSum = weekDates.reduce((s, date) => s + entriesForDate(date).reduce((s2, e) => s2 + e.hours, 0), 0);
+  const weekSum = weekDates.reduce(
+    (s, date) => s + entriesForDate(date).reduce((s2, e) => s2 + e.hours, 0),
+    0,
+  );
   document.getElementById("weekTotal").textContent = fmt(weekSum) + " t";
 
-  rows.querySelectorAll(".wr-clear").forEach(btn => {
+  rows.querySelectorAll(".wr-clear").forEach((btn) => {
     btn.addEventListener("click", () => {
       const date = btn.dataset.date;
-      entries = entries.filter(e => e.date !== date);
+      entries = entries.filter((e) => e.date !== date);
       save();
       render();
       renderBatch();
+      showUndo("Dag slettet", before);
     });
   });
 }
@@ -261,13 +327,19 @@ document.getElementById("nextWeekBtn").addEventListener("click", () => {
   renderBatch();
 });
 document.getElementById("saveWeekBtn").addEventListener("click", () => {
-  document.querySelectorAll("#weekRows .week-row").forEach(row => {
+  document.querySelectorAll("#weekRows .week-row").forEach((row) => {
     const date = row.dataset.date;
     const input = row.querySelector(".wr-hours");
     const val = parseFloat(input.value);
     if (input.value.trim() === "" || isNaN(val) || val <= 0) return;
-    entries = entries.filter(e => e.date !== date);
-    entries.push({ id: crypto.randomUUID(), date, hours: val, note: "" });
+
+    const existing = entriesForDate(date);
+    const currentSum = existing.reduce((s, e) => s + e.hours, 0);
+    if (Math.abs(val - currentSum) < 0.001) return;
+
+    const note = existing[0]?.note || "";
+    entries = entries.filter((e) => e.date !== date);
+    entries.push({ id: crypto.randomUUID(), date, hours: val, note });
   });
   save();
   render();
