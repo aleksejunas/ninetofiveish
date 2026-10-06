@@ -398,6 +398,20 @@ function entriesForDate(dateStr) {
   return visible().filter((e) => e.date === dateStr);
 }
 
+// Summen følger det som står i feltene, så den oppdateres mens man skriver.
+// Tomme felt teller som lagret verdi, siden «Lagre uke» lar dem være urørt.
+function updateWeekTotal() {
+  let sum = 0;
+  document.querySelectorAll("#weekRows .week-row").forEach((row) => {
+    const val = parseFloat(row.querySelector(".wr-hours").value);
+    sum +=
+      val > 0
+        ? val
+        : entriesForDate(row.dataset.date).reduce((s, e) => s + e.hours, 0);
+  });
+  document.getElementById("weekTotal").textContent = fmt(sum) + " t";
+}
+
 function renderBatch() {
   const weekDates = Array.from({ length: 7 }, (_, i) =>
     addDays(currentWeekStart, i),
@@ -426,11 +440,10 @@ function renderBatch() {
     })
     .join("");
 
-  const weekSum = weekDates.reduce(
-    (s, date) => s + entriesForDate(date).reduce((s2, e) => s2 + e.hours, 0),
-    0,
-  );
-  document.getElementById("weekTotal").textContent = fmt(weekSum) + " t";
+  updateWeekTotal();
+  rows.querySelectorAll(".wr-hours").forEach((input) => {
+    input.addEventListener("input", updateWeekTotal);
+  });
 
   rows.querySelectorAll(".wr-clear").forEach((btn) => {
     btn.addEventListener("click", () => {

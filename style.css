@@ -387,8 +387,14 @@ button {
 .week-total {
   display: flex;
   justify-content: space-between;
-  padding: 12px 0 4px;
+  align-items: baseline;
+  padding: 12px 0;
   font-size: 13px;
   color: var(--text-dim);
   font-weight: 650;
+}
+.week-total #weekTotal {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
 }
