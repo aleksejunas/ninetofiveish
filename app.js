@@ -166,7 +166,20 @@ function render() {
     const [y, m] = g.key.split("-");
     html += `<div class="month-title"><span>${MONTHS[parseInt(m, 10) - 1]} ${y}</span><span>${fmt(g.sum)} t</span></div>`;
     html += '<div class="card" style="padding:0;">';
+    // Ukesum innenfor måneden – en uke som krysser månedsskiftet vises
+    // med sin del under hver måned
+    const weekSums = new Map();
     for (const e of g.items) {
+      const wn = isoWeekNumber(e.date);
+      weekSums.set(wn, (weekSums.get(wn) || 0) + e.hours);
+    }
+    let lastWeek = null;
+    for (const e of g.items) {
+      const wn = isoWeekNumber(e.date);
+      if (wn !== lastWeek) {
+        html += `<div class="week-head"><span>Uke ${wn}</span><span>${fmt(weekSums.get(wn))} t</span></div>`;
+        lastWeek = wn;
+      }
       const d = new Date(e.date + "T00:00:00");
       const noteHtml =
         e.id === editingNoteId
