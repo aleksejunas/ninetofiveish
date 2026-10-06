@@ -15,14 +15,34 @@ const MONTHS = [
   "desember",
 ];
 
+// Eldre nøkler fra før rebrand – data herfra flettes inn ved oppstart
+const LEGACY_KEYS = ["aks-timer-entries"];
+
 let entries = load();
 let editingNoteId = null;
 
+function readKey(key) {
+  const raw = localStorage.getItem(key);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed;
+  } catch {}
+  // Ugyldig innhold: ta vare på det i stedet for å overskrive det ved neste lagring
+  localStorage.setItem(`${key}-corrupt-${Date.now()}`, raw);
+  return [];
+}
 function load() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
+    const byId = new Map();
+    for (const key of [...LEGACY_KEYS, STORAGE_KEY]) {
+      for (const e of readKey(key)) byId.set(e.id, e);
+    }
+    const merged = [...byId.values()];
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+    return merged;
+  } catch (e) {
+    console.error("Kunne ikke laste:", e);
     return [];
   }
 }
@@ -31,8 +51,12 @@ function save() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
   } catch (e) {
     console.error("Kunne ikke lagre:", e);
+    alert("Kunne ikke lagre! Eksporter dataene dine som backup.");
   }
 }
+
+// Be nettleseren om å ikke slette data automatisk ved lite lagringsplass
+navigator.storage?.persist?.();
 
 function todayStr() {
   const d = new Date();
@@ -208,7 +232,6 @@ function hideUndo() {
 document.getElementById("toastUndo").addEventListener("click", () => {
   if (undoState) {
     entries = undoState;
-    entries = undoState;
     save();
     render();
     renderBatch();
@@ -296,6 +319,7 @@ function renderBatch() {
   rows.querySelectorAll(".wr-clear").forEach((btn) => {
     btn.addEventListener("click", () => {
       const date = btn.dataset.date;
+      const before = entries;
       entries = entries.filter((e) => e.date !== date);
       save();
       render();

@@ -1,4 +1,4 @@
-const CACHE_NAME = "ninetofiveish-v2";
+const CACHE_NAME = "ninetofiveish-v3";
 const APP_SHELL = [
   "./",
   "./index.html",
