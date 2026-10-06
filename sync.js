@@ -44,16 +44,20 @@ function base64url(bytes) {
     .replace(/=+$/, "");
 }
 
-async function startConnect() {
-  if (!DROPBOX_APP_KEY) {
-    alert("DROPBOX_APP_KEY mangler i sync.js.");
-    return;
-  }
-  const verifier = base64url(crypto.getRandomValues(new Uint8Array(64)));
-  localStorage.setItem(VERIFIER_KEY, verifier);
+// Lenken lages på forhånd: Safari blokkerer window.open som skjer etter en
+// await, så selve trykket må åpne Dropbox synkront.
+let authUrl = null;
+
+async function prepareAuthUrl() {
+  // Gjenbruk eksisterende verifier: iOS kan starte PWA-en på nytt mens man
+  // henter koden i Safari, og koden må passe med verifieren den ble laget for
+  const verifier =
+    localStorage.getItem(VERIFIER_KEY) ||
+    base64url(crypto.getRandomValues(new Uint8Array(64)));
   const challenge = base64url(
     await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)),
   );
+  localStorage.setItem(VERIFIER_KEY, verifier);
   const params = new URLSearchParams({
     client_id: DROPBOX_APP_KEY,
     response_type: "code",
@@ -61,9 +65,19 @@ async function startConnect() {
     code_challenge_method: "S256",
     token_access_type: "offline",
   });
-  window.open(`https://www.dropbox.com/oauth2/authorize?${params}`, "_blank");
+  authUrl = `https://www.dropbox.com/oauth2/authorize?${params}`;
+  document.getElementById("syncAuthLink").href = authUrl;
+}
+
+function startConnect() {
+  if (!DROPBOX_APP_KEY) {
+    alert("DROPBOX_APP_KEY mangler i sync.js.");
+    return;
+  }
+  if (authUrl) window.open(authUrl, "_blank");
+  else prepareAuthUrl();
+  // Lenken i boksen er reserve hvis vinduet ble blokkert
   document.getElementById("syncConnect").hidden = false;
-  document.getElementById("syncCode").focus();
 }
 
 async function finishConnect(code) {
@@ -91,6 +105,7 @@ async function disconnect() {
   setTokens(null);
   updateSyncButton();
   setStatus("Dropbox: ikke tilkoblet");
+  prepareAuthUrl();
   try {
     await fetch("https://api.dropboxapi.com/2/auth/token/revoke", {
       method: "POST",
@@ -273,5 +288,8 @@ function initSync() {
 
   updateSyncButton();
   if (isConnected()) sync();
-  else setStatus("Dropbox: ikke tilkoblet");
+  else {
+    setStatus("Dropbox: ikke tilkoblet");
+    prepareAuthUrl();
+  }
 }

@@ -259,9 +259,17 @@ function hideUndo() {
 }
 document.getElementById("toastUndo").addEventListener("click", () => {
   if (undoState) {
-    // Det som angres må bli nyest, ellers vinner slettingen ved neste synk
+    // Det som angres må bli nyest, ellers vinner forrige versjon ved neste
+    // synk. Oppføringer som ikke fantes i snapshotet (f.eks. importerte)
+    // blir tombstones i stedet for å forsvinne, så de ikke kommer tilbake.
     const current = new Map(entries.map((e) => [e.id, e]));
-    entries = undoState.map((e) => (current.get(e.id) === e ? e : touch(e)));
+    const snapshotIds = new Set(undoState.map((e) => e.id));
+    entries = [
+      ...undoState.map((e) => (current.get(e.id) === e ? e : touch(e))),
+      ...entries
+        .filter((e) => !snapshotIds.has(e.id))
+        .map((e) => (e.deleted ? e : touch(e, { deleted: true }))),
+    ];
     save();
     render();
     renderBatch();
@@ -309,6 +317,65 @@ document.getElementById("exportBtn").addEventListener("click", () => {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+});
+
+// Leser formatet fra eksporten: Dato;Timer;Notat, med komma eller punktum
+// som desimaltegn. Rader som allerede finnes (samme dato, timer og notat)
+// hoppes over, så samme fil kan importeres flere ganger uten duplikater.
+function parseCsv(text) {
+  const rows = [];
+  let invalid = 0;
+  for (const line of text.replace(/^﻿/, "").split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    const [date, hoursStr, ...noteParts] = line.split(";");
+    const hours = parseFloat((hoursStr || "").trim().replace(",", "."));
+    const d = date.trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || isNaN(hours) || hours <= 0) {
+      if (!/^dato$/i.test(d)) invalid++;
+      continue;
+    }
+    rows.push({ date: d, hours, note: noteParts.join(",").trim() });
+  }
+  return { rows, invalid };
+}
+
+document.getElementById("importBtn").addEventListener("click", () => {
+  document.getElementById("importFile").click();
+});
+document.getElementById("importFile").addEventListener("change", async (ev) => {
+  const file = ev.target.files[0];
+  ev.target.value = "";
+  if (!file) return;
+
+  const { rows, invalid } = parseCsv(await file.text());
+  const key = (e) => `${e.date}|${e.hours}|${e.note || ""}`;
+  const existing = new Set(visible().map(key));
+  const fresh = rows.filter((r) => {
+    if (existing.has(key(r))) return false;
+    existing.add(key(r));
+    return true;
+  });
+
+  const skipped = rows.length - fresh.length;
+  const details = [];
+  if (skipped) details.push(`${skipped} fantes fra før`);
+  if (invalid) details.push(`${invalid} ugyldige rader`);
+  const suffix = details.length ? ` (${details.join(", ")})` : "";
+  if (fresh.length === 0) {
+    alert(`Ingen nye vakter å importere${suffix}.`);
+    return;
+  }
+
+  const before = entries;
+  const now = Date.now();
+  entries = [
+    ...entries,
+    ...fresh.map((r) => ({ id: crypto.randomUUID(), ...r, updatedAt: now })),
+  ];
+  save();
+  render();
+  renderBatch();
+  showUndo(`Importerte ${fresh.length} vakter${suffix}`, before);
 });
 
 // ---- Batch/ukevisning ----

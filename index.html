@@ -109,14 +109,19 @@
 
       <div class="footer-actions">
         <button class="btn-ghost" id="exportBtn">Eksporter CSV</button>
-        <button class="btn-ghost" id="syncConnectBtn">Koble til Dropbox</button>
+        <button class="btn-ghost" id="importBtn">Importer CSV</button>
+        <button class="btn-ghost sync-btn" id="syncConnectBtn">
+          Koble til Dropbox
+        </button>
+        <input type="file" id="importFile" accept=".csv,text/csv" hidden />
       </div>
       <div class="sync-status" id="syncStatus"></div>
 
       <div class="card sync-connect" id="syncConnect" hidden>
         <p>
           Godkjenn tilgang i Dropbox-vinduet som åpnet seg, kopier koden du får,
-          og lim den inn her.
+          og lim den inn her. Åpnet det seg ikke noe vindu?
+          <a id="syncAuthLink" target="_blank" rel="noopener">Åpne Dropbox</a>
         </p>
         <div class="row">
           <input type="text" id="syncCode" placeholder="Kode fra Dropbox" />

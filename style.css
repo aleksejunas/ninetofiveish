@@ -251,11 +251,15 @@ button {
 
 .footer-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   margin-top: 22px;
 }
 .footer-actions button {
   flex: 1;
+}
+.footer-actions .sync-btn {
+  flex-basis: 100%;
 }
 .sync-status {
   margin-top: 10px;
@@ -273,6 +277,9 @@ button {
   margin: 0 0 12px;
   font-size: 14px;
   color: var(--text-dim);
+}
+.sync-connect a {
+  color: var(--accent);
 }
 
 .mode-toggle {
