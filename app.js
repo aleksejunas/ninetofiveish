@@ -32,13 +32,22 @@ function readKey(key) {
   localStorage.setItem(`${key}-corrupt-${Date.now()}`, raw);
   return [];
 }
+// Fletter to lister per id – nyeste updatedAt vinner. Slettede oppføringer
+// beholdes som tombstones (deleted: true) så slettingen også synkes.
+function mergeEntries(a, b) {
+  const byId = new Map();
+  for (const e of [...a, ...b]) {
+    const cur = byId.get(e.id);
+    if (!cur || (e.updatedAt || 0) > (cur.updatedAt || 0)) byId.set(e.id, e);
+  }
+  return [...byId.values()];
+}
 function load() {
   try {
-    const byId = new Map();
+    let merged = [];
     for (const key of [...LEGACY_KEYS, STORAGE_KEY]) {
-      for (const e of readKey(key)) byId.set(e.id, e);
+      merged = mergeEntries(merged, readKey(key));
     }
-    const merged = [...byId.values()];
     localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
     return merged;
   } catch (e) {
@@ -46,13 +55,29 @@ function load() {
     return [];
   }
 }
-function save() {
+function saveLocal() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
   } catch (e) {
     console.error("Kunne ikke lagre:", e);
     alert("Kunne ikke lagre! Eksporter dataene dine som backup.");
   }
+}
+function save() {
+  saveLocal();
+  scheduleSync();
+}
+
+function touch(e, changes = {}) {
+  return { ...e, ...changes, updatedAt: Date.now() };
+}
+function visible() {
+  return entries.filter((e) => !e.deleted);
+}
+function removeWhere(pred) {
+  entries = entries.map((e) =>
+    !e.deleted && pred(e) ? touch(e, { deleted: true }) : e,
+  );
 }
 
 // Be nettleseren om å ikke slette data automatisk ved lite lagringsplass
@@ -101,7 +126,7 @@ function shortDate(dateStr) {
 
 function render() {
   const list = document.getElementById("list");
-  const sorted = [...entries].sort((a, b) => b.date.localeCompare(a.date));
+  const sorted = visible().sort((a, b) => b.date.localeCompare(a.date));
 
   // summaries
   const today = todayStr();
@@ -115,7 +140,7 @@ function render() {
     .reduce((s, e) => s + e.hours, 0);
   document.getElementById("sumMonth").textContent = fmt(sumMonth);
   document.getElementById("sumWeek").textContent = fmt(sumWeek);
-  document.getElementById("sumCount").textContent = entries.length;
+  document.getElementById("sumCount").textContent = sorted.length;
 
   if (sorted.length === 0) {
     list.innerHTML = '<div class="empty">Ingen vakter registrert ennå.</div>';
@@ -167,7 +192,7 @@ function render() {
   list.querySelectorAll(".del").forEach((btn) => {
     btn.addEventListener("click", () => {
       const before = entries;
-      entries = entries.filter((e) => e.id !== btn.dataset.id);
+      removeWhere((e) => e.id === btn.dataset.id);
       save();
       render();
       showUndo("Oppføring slettet", before);
@@ -186,8 +211,11 @@ function render() {
     noteInput.focus();
     noteInput.setSelectionRange(noteInput.value.length, noteInput.value.length);
     const commit = () => {
-      const entry = entries.find((e) => e.id === noteInput.dataset.id);
-      if (entry) entry.note = noteInput.value.trim();
+      const id = noteInput.dataset.id;
+      const note = noteInput.value.trim();
+      entries = entries.map((e) =>
+        e.id === id && e.note !== note ? touch(e, { note }) : e,
+      );
       editingNoteId = null;
       save();
       render();
@@ -231,7 +259,9 @@ function hideUndo() {
 }
 document.getElementById("toastUndo").addEventListener("click", () => {
   if (undoState) {
-    entries = undoState;
+    // Det som angres må bli nyest, ellers vinner slettingen ved neste synk
+    const current = new Map(entries.map((e) => [e.id, e]));
+    entries = undoState.map((e) => (current.get(e.id) === e ? e : touch(e)));
     save();
     render();
     renderBatch();
@@ -248,7 +278,13 @@ document.getElementById("entryForm").addEventListener("submit", (ev) => {
   const note = document.getElementById("note").value.trim();
   if (!date || isNaN(hours) || hours <= 0) return;
 
-  entries.push({ id: crypto.randomUUID(), date, hours, note });
+  entries.push({
+    id: crypto.randomUUID(),
+    date,
+    hours,
+    note,
+    updatedAt: Date.now(),
+  });
   save();
   render();
 
@@ -259,7 +295,7 @@ document.getElementById("entryForm").addEventListener("submit", (ev) => {
 });
 
 document.getElementById("exportBtn").addEventListener("click", () => {
-  const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date));
+  const sorted = visible().sort((a, b) => a.date.localeCompare(b.date));
   let csv = "Dato;Timer;Notat\n";
   for (const e of sorted) {
     csv += `${e.date};${fmt(e.hours)};${(e.note || "").replace(/;/g, ",")}\n`;
@@ -279,7 +315,7 @@ document.getElementById("exportBtn").addEventListener("click", () => {
 let currentWeekStart = getMonday(todayStr());
 
 function entriesForDate(dateStr) {
-  return entries.filter((e) => e.date === dateStr);
+  return visible().filter((e) => e.date === dateStr);
 }
 
 function renderBatch() {
@@ -320,7 +356,7 @@ function renderBatch() {
     btn.addEventListener("click", () => {
       const date = btn.dataset.date;
       const before = entries;
-      entries = entries.filter((e) => e.date !== date);
+      removeWhere((e) => e.date === date);
       save();
       render();
       renderBatch();
@@ -362,8 +398,14 @@ document.getElementById("saveWeekBtn").addEventListener("click", () => {
     if (Math.abs(val - currentSum) < 0.001) return;
 
     const note = existing[0]?.note || "";
-    entries = entries.filter((e) => e.date !== date);
-    entries.push({ id: crypto.randomUUID(), date, hours: val, note });
+    removeWhere((e) => e.date === date);
+    entries.push({
+      id: crypto.randomUUID(),
+      date,
+      hours: val,
+      note,
+      updatedAt: Date.now(),
+    });
   });
   save();
   render();
@@ -371,3 +413,4 @@ document.getElementById("saveWeekBtn").addEventListener("click", () => {
 });
 
 render();
+initSync();

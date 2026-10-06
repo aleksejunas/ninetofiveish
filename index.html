@@ -109,12 +109,28 @@
 
       <div class="footer-actions">
         <button class="btn-ghost" id="exportBtn">Eksporter CSV</button>
+        <button class="btn-ghost" id="syncConnectBtn">Koble til Dropbox</button>
+      </div>
+      <div class="sync-status" id="syncStatus"></div>
+
+      <div class="card sync-connect" id="syncConnect" hidden>
+        <p>
+          Godkjenn tilgang i Dropbox-vinduet som åpnet seg, kopier koden du får,
+          og lim den inn her.
+        </p>
+        <div class="row">
+          <input type="text" id="syncCode" placeholder="Kode fra Dropbox" />
+          <button type="button" class="btn-primary" id="syncCodeBtn">
+            Fullfør
+          </button>
+        </div>
       </div>
     </div>
     <div id="toast" class="toast" hidden>
       <span id="toastMsg"></span>
       <button type="button" id="toastUndo">Angre</button>
     </div>
+    <script src="sync.js"></script>
     <script src="app.js"></script>
     <script>
       if ("serviceWorker" in navigator) {

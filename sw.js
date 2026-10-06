@@ -1,8 +1,9 @@
-const CACHE_NAME = "ninetofiveish-v3";
+const CACHE_NAME = "ninetofiveish-v4";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./style.css",
+  "./sync.js",
   "./app.js",
   "./manifest.json",
   "./icons/icon-192.png",
@@ -33,9 +34,9 @@ self.addEventListener("activate", (event) => {
 // ny versjon i bakgrunnen så oppdateringer dukker opp neste gang appen åpnes
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+  // Aldri cache andre domener (f.eks. Dropbox)
+  if (new URL(event.request.url).origin !== self.location.origin) return;
   event.respondWith(
-    // Stale-while-revalidate: vis det som ligger i cache med en gang, men hent
-    // ny versjon i bakgrunnen så oppdateringer dukker opp neste gang appen åpnes
     caches.open(CACHE_NAME).then(async (cache) => {
       const cached = await cache.match(event.request);
       const network = fetch(event.request)

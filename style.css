@@ -257,6 +257,23 @@ button {
 .footer-actions button {
   flex: 1;
 }
+.sync-status {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--text-dim);
+  text-align: center;
+}
+.sync-connect {
+  margin-top: 16px;
+}
+.sync-connect[hidden] {
+  display: none;
+}
+.sync-connect p {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: var(--text-dim);
+}
 
 .mode-toggle {
   display: flex;
