@@ -105,6 +105,7 @@ label {
 }
 input[type="date"],
 input[type="number"],
+input[type="time"],
 input[type="text"] {
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -243,6 +244,13 @@ button {
   font-size: 16px;
   font-weight: 650;
   flex-shrink: 0;
+  text-align: right;
+}
+.entry .hours small {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-dim);
 }
 .entry .del {
   color: var(--text-dim);
@@ -272,7 +280,7 @@ button {
 .footer-actions button {
   flex: 1;
 }
-.footer-actions .sync-btn {
+.footer-actions .full-btn {
   flex-basis: 100%;
 }
 .sync-status {
@@ -341,7 +349,7 @@ button {
 .week-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 5px;
   padding: 8px 0;
   border-bottom: 1px solid var(--border);
 }
@@ -352,7 +360,7 @@ button {
   color: var(--accent);
 }
 .week-row .wr-date {
-  width: 56px;
+  width: 38px;
   flex-shrink: 0;
 }
 .week-row .wr-date .wd {
@@ -364,14 +372,29 @@ button {
   font-size: 15px;
   font-weight: 600;
 }
-.week-row .wr-hours {
+.week-row input[type="time"] {
   flex: 1;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
+  min-width: 0;
+  width: auto;
   border-radius: 8px;
-  padding: 9px 10px;
-  font-size: 15px;
-  color: var(--text);
+  padding: 9px 2px;
+  font-size: 13px;
+  text-align: center;
+}
+.week-row input[type="time"]::-webkit-calendar-picker-indicator {
+  display: none;
+}
+.week-row .wr-multi {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.week-row .wr-sum {
+  width: 34px;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 650;
+  text-align: right;
 }
 .week-row .wr-clear {
   background: none;
@@ -397,4 +420,106 @@ button {
   font-size: 18px;
   font-weight: 700;
   color: var(--text);
+}
+
+.calc-hours {
+  flex: 0 0 56px;
+}
+.calc-hours #calcHours {
+  padding: 11px 0;
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.form-panel {
+  margin-top: 16px;
+}
+.form-panel[hidden] {
+  display: none;
+}
+.form-panel .btn-primary {
+  width: 100%;
+}
+.form-warnings {
+  margin: 0 0 12px;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--danger);
+}
+.form-warnings:empty {
+  display: none;
+}
+
+.print-form {
+  display: none;
+}
+@media print {
+  @page {
+    size: A4;
+    margin: 10mm 12mm;
+  }
+  html,
+  body {
+    background: #fff;
+    color: #000;
+  }
+  .wrap,
+  .toast {
+    display: none !important;
+  }
+  .print-form {
+    display: block;
+    color: #000;
+    font-size: 9pt;
+  }
+  .print-form h2 {
+    margin: 0;
+    font-size: 15pt;
+    text-align: center;
+  }
+  .print-form h3 {
+    margin: 1mm 0;
+    font-size: 10pt;
+    text-align: center;
+  }
+  .print-form p {
+    margin: 1mm 0;
+  }
+  .print-form .small {
+    font-size: 8pt;
+    font-weight: 600;
+  }
+  .print-form .name {
+    padding: 1mm 1.5mm;
+    border: 1px solid #000;
+    border-bottom: none;
+  }
+  .print-form table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    margin-bottom: 2mm;
+  }
+  .print-form th,
+  .print-form td {
+    height: 5mm;
+    padding: 0 1.5mm;
+    border: 1px solid #000;
+    font-size: 8.5pt;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .print-form .sign {
+    margin: 4mm 0 3mm;
+  }
+  .print-form .sign span {
+    display: inline-block;
+    width: 80mm;
+    border-bottom: 1px dotted #000;
+  }
+  .print-form .leader-title {
+    font-size: 8.5pt;
+  }
 }

@@ -52,23 +52,22 @@
         </div>
 
         <form id="entryForm">
+          <div class="field">
+            <label for="date">Dato</label>
+            <input type="date" id="date" required />
+          </div>
           <div class="row">
             <div class="field">
-              <label for="date">Dato</label>
-              <input type="date" id="date" required />
+              <label for="from">Fra</label>
+              <input type="time" id="from" required />
             </div>
             <div class="field">
-              <label for="hours">Timer</label>
-              <input
-                type="number"
-                id="hours"
-                step="0.25"
-                min="0"
-                max="24"
-                placeholder="3.5"
-                required
-                inputmode="decimal"
-              />
+              <label for="to">Til</label>
+              <input type="time" id="to" required />
+            </div>
+            <div class="field calc-hours">
+              <label>Timer</label>
+              <div id="calcHours">–</div>
             </div>
           </div>
           <div class="field">
@@ -110,12 +109,36 @@
       <div class="footer-actions">
         <button class="btn-ghost" id="exportBtn">Eksporter CSV</button>
         <button class="btn-ghost" id="importBtn">Importer CSV</button>
-        <button class="btn-ghost sync-btn" id="syncConnectBtn">
+        <button class="btn-ghost full-btn" id="formBtn">Timeskjema</button>
+        <button class="btn-ghost full-btn" id="syncConnectBtn">
           Koble til Dropbox
         </button>
         <input type="file" id="importFile" accept=".csv,text/csv" hidden />
       </div>
       <div class="sync-status" id="syncStatus"></div>
+
+      <div class="card form-panel" id="formPanel" hidden>
+        <div class="week-nav">
+          <button type="button" id="prevPeriodBtn" aria-label="Forrige periode">
+            ‹
+          </button>
+          <div class="wk-label" id="periodLabel"></div>
+          <button type="button" id="nextPeriodBtn" aria-label="Neste periode">
+            ›
+          </button>
+        </div>
+        <div class="field">
+          <label for="formName">Navn på skjemaet</label>
+          <input type="text" id="formName" autocomplete="name" />
+        </div>
+        <div class="week-total">
+          <span id="periodCount"></span><span id="periodTotal"></span>
+        </div>
+        <ul class="form-warnings" id="formWarnings"></ul>
+        <button type="button" class="btn-primary" id="printFormBtn">
+          Skriv ut / lagre som PDF
+        </button>
+      </div>
 
       <div class="card sync-connect" id="syncConnect" hidden>
         <p>
@@ -135,7 +158,9 @@
       <span id="toastMsg"></span>
       <button type="button" id="toastUndo">Angre</button>
     </div>
+    <div class="print-form" id="printForm"></div>
     <script src="sync.js"></script>
+    <script src="form.js"></script>
     <script src="app.js"></script>
     <script>
       if ("serviceWorker" in navigator) {

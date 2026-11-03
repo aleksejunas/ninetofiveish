@@ -1,9 +1,10 @@
-const CACHE_NAME = "ninetofiveish-v6";
+const CACHE_NAME = "ninetofiveish-v7";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./style.css",
   "./sync.js",
+  "./form.js",
   "./app.js",
   "./manifest.json",
   "./icons/icon-192.png",

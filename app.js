@@ -124,7 +124,19 @@ function shortDate(dateStr) {
   return `${d.getDate()}.${d.getMonth() + 1}`;
 }
 
+// Timer mellom to klokkeslett, eller null hvis til ikke er etter fra
+function hoursBetween(from, to) {
+  if (!from || !to) return null;
+  const minutes = (t) => {
+    const [h, m] = t.split(":").map(Number);
+    return h * 60 + m;
+  };
+  const diff = minutes(to) - minutes(from);
+  return diff > 0 ? Math.round((diff / 60) * 100) / 100 : null;
+}
+
 function render() {
+  renderFormPanel();
   const list = document.getElementById("list");
   const sorted = visible().sort((a, b) => b.date.localeCompare(a.date));
 
@@ -194,7 +206,10 @@ function render() {
             <div class="dm">${d.getDate()}.${d.getMonth() + 1}</div>
           </div>
           ${noteHtml}
-          <div class="hours">${fmt(e.hours)} t</div>
+          <div class="hours">
+            ${fmt(e.hours)} t
+            ${e.from ? `<small>${escapeHtml(e.from)}–${escapeHtml(e.to)}</small>` : ""}
+          </div>
           <button class="del" data-id="${e.id}" aria-label="Slett">✕</button>
         </div>`;
     }
@@ -292,16 +307,45 @@ document.getElementById("toastUndo").addEventListener("click", () => {
 
 document.getElementById("date").value = todayStr();
 
+function updateCalcHours() {
+  const fromInput = document.getElementById("from");
+  const toInput = document.getElementById("to");
+  const hours = hoursBetween(fromInput.value, toInput.value);
+  const bothSet = fromInput.value && toInput.value;
+  toInput.setCustomValidity(
+    bothSet && hours === null ? "Til må være etter fra" : "",
+  );
+  document.getElementById("calcHours").textContent =
+    hours === null ? "–" : `${fmt(hours)} t`;
+}
+document.getElementById("from").addEventListener("input", updateCalcHours);
+document.getElementById("to").addEventListener("input", updateCalcHours);
+
+// Vaktene ligner ofte på hverandre, så start med klokkeslettene fra sist
+function prefillTimes() {
+  const last = visible()
+    .filter((e) => e.from)
+    .sort((a, b) => b.date.localeCompare(a.date))[0];
+  if (!last) return;
+  document.getElementById("from").value = last.from;
+  document.getElementById("to").value = last.to;
+  updateCalcHours();
+}
+
 document.getElementById("entryForm").addEventListener("submit", (ev) => {
   ev.preventDefault();
   const date = document.getElementById("date").value;
-  const hours = parseFloat(document.getElementById("hours").value);
+  const from = document.getElementById("from").value;
+  const to = document.getElementById("to").value;
+  const hours = hoursBetween(from, to);
   const note = document.getElementById("note").value.trim();
-  if (!date || isNaN(hours) || hours <= 0) return;
+  if (!date || hours === null) return;
 
   entries.push({
     id: crypto.randomUUID(),
     date,
+    from,
+    to,
     hours,
     note,
     updatedAt: Date.now(),
@@ -309,17 +353,16 @@ document.getElementById("entryForm").addEventListener("submit", (ev) => {
   save();
   render();
 
-  document.getElementById("hours").value = "";
   document.getElementById("note").value = "";
   document.getElementById("date").value = todayStr();
-  document.getElementById("hours").focus();
+  document.getElementById("from").focus();
 });
 
 document.getElementById("exportBtn").addEventListener("click", () => {
   const sorted = visible().sort((a, b) => a.date.localeCompare(b.date));
-  let csv = "Dato;Timer;Notat\n";
+  let csv = "Dato;Fra;Til;Timer;Notat\n";
   for (const e of sorted) {
-    csv += `${e.date};${fmt(e.hours)};${(e.note || "").replace(/;/g, ",")}\n`;
+    csv += `${e.date};${e.from || ""};${e.to || ""};${fmt(e.hours)};${(e.note || "").replace(/;/g, ",")}\n`;
   }
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
@@ -332,22 +375,34 @@ document.getElementById("exportBtn").addEventListener("click", () => {
   URL.revokeObjectURL(url);
 });
 
-// Leser formatet fra eksporten: Dato;Timer;Notat, med komma eller punktum
-// som desimaltegn. Rader som allerede finnes (samme dato, timer og notat)
-// hoppes over, så samme fil kan importeres flere ganger uten duplikater.
+// Leser formatet fra eksporten: Dato;Fra;Til;Timer;Notat, og det eldre
+// Dato;Timer;Notat, med komma eller punktum som desimaltegn. Rader som allerede
+// finnes hoppes over, så samme fil kan importeres flere ganger uten duplikater.
 function parseCsv(text) {
   const rows = [];
   let invalid = 0;
+  let hasTimeColumns = false;
+  const isTime = (s) => /^\d{2}:\d{2}$/.test(s);
   for (const line of text.replace(/^﻿/, "").split(/\r?\n/)) {
     if (!line.trim()) continue;
-    const [date, hoursStr, ...noteParts] = line.split(";");
-    const hours = parseFloat((hoursStr || "").trim().replace(",", "."));
-    const d = date.trim();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || isNaN(hours) || hours <= 0) {
-      if (!/^dato$/i.test(d)) invalid++;
+    const cols = line.split(";").map((c) => c.trim());
+    const d = cols[0];
+    if (/^dato$/i.test(d)) {
+      hasTimeColumns = /^fra$/i.test(cols[1] || "");
       continue;
     }
-    rows.push({ date: d, hours, note: noteParts.join(",").trim() });
+    const withTimes = hasTimeColumns || isTime(cols[1] || "");
+    const [from, to, hoursStr, ...noteParts] = withTimes
+      ? cols.slice(1)
+      : ["", "", ...cols.slice(1)];
+    const hours = parseFloat((hoursStr || "").replace(",", "."));
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || isNaN(hours) || hours <= 0) {
+      invalid++;
+      continue;
+    }
+    const row = { date: d, hours, note: noteParts.join(",").trim() };
+    if (isTime(from) && isTime(to)) Object.assign(row, { from, to });
+    rows.push(row);
   }
   return { rows, invalid };
 }
@@ -361,11 +416,23 @@ document.getElementById("importFile").addEventListener("change", async (ev) => {
   if (!file) return;
 
   const { rows, invalid } = parseCsv(await file.text());
-  const key = (e) => `${e.date}|${e.hours}|${e.note || ""}`;
-  const existing = new Set(visible().map(key));
+  // To like vakter med ulike klokkeslett er ikke duplikater, men en rad uten
+  // klokkeslett regnes som lik en vakt med samme dato, timer og notat
+  const base = (e) => `${e.date}|${e.hours}|${e.note || ""}`;
+  const timed = (e) => `${base(e)}|${e.from}|${e.to}`;
+  const untimed = (e) => `${base(e)}|untimed`;
+  const seen = new Set();
+  const mark = (e) => {
+    seen.add(base(e));
+    seen.add(e.from ? timed(e) : untimed(e));
+  };
+  visible().forEach(mark);
   const fresh = rows.filter((r) => {
-    if (existing.has(key(r))) return false;
-    existing.add(key(r));
+    const dup = r.from
+      ? seen.has(timed(r)) || seen.has(untimed(r))
+      : seen.has(base(r));
+    if (dup) return false;
+    mark(r);
     return true;
   });
 
@@ -399,15 +466,17 @@ function entriesForDate(dateStr) {
 }
 
 // Summen følger det som står i feltene, så den oppdateres mens man skriver.
-// Tomme felt teller som lagret verdi, siden «Lagre uke» lar dem være urørt.
+// Ufullstendige felt teller som lagret verdi, siden «Lagre uke» ikke endrer dem.
 function updateWeekTotal() {
   let sum = 0;
   document.querySelectorAll("#weekRows .week-row").forEach((row) => {
-    const val = parseFloat(row.querySelector(".wr-hours").value);
-    sum +=
-      val > 0
-        ? val
-        : entriesForDate(row.dataset.date).reduce((s, e) => s + e.hours, 0);
+    const hours =
+      hoursBetween(
+        row.querySelector(".wr-from")?.value,
+        row.querySelector(".wr-to")?.value,
+      ) ?? entriesForDate(row.dataset.date).reduce((s, e) => s + e.hours, 0);
+    row.querySelector(".wr-sum").textContent = hours > 0 ? `${fmt(hours)} t` : "";
+    sum += hours;
   });
   document.getElementById("weekTotal").textContent = fmt(sum) + " t";
 }
@@ -425,23 +494,29 @@ function renderBatch() {
   rows.innerHTML = weekDates
     .map((date) => {
       const existing = entriesForDate(date);
-      const sum = existing.reduce((s, e) => s + e.hours, 0);
+      const only = existing.length === 1 ? existing[0] : null;
       const d = new Date(date + "T00:00:00");
+      // Flere vakter samme dag passer ikke i én rad, de føres under «Enkelt»
+      const fields =
+        existing.length > 1
+          ? `<div class="wr-multi">${existing.length} vakter</div>`
+          : `<input type="time" class="wr-from" aria-label="Fra" value="${escapeHtml(only?.from || "")}">
+             <input type="time" class="wr-to" aria-label="Til" value="${escapeHtml(only?.to || "")}">`;
       return `
       <div class="week-row${date === today ? " is-today" : ""}" data-date="${date}">
         <div class="wr-date">
           <div class="wd">${WEEKDAYS[d.getDay()]}</div>
           <div class="dm">${d.getDate()}.${d.getMonth() + 1}</div>
         </div>
-        <input type="number" class="wr-hours" step="0.25" min="0" max="24" inputmode="decimal"
-               placeholder="–" value="${sum > 0 ? fmt(sum).replace(",", ".") : ""}">
+        ${fields}
+        <div class="wr-sum"></div>
         <button type="button" class="wr-clear" data-date="${date}" aria-label="Fjern">✕</button>
       </div>`;
     })
     .join("");
 
   updateWeekTotal();
-  rows.querySelectorAll(".wr-hours").forEach((input) => {
+  rows.querySelectorAll(".wr-from, .wr-to").forEach((input) => {
     input.addEventListener("input", updateWeekTotal);
   });
 
@@ -480,30 +555,48 @@ document.getElementById("nextWeekBtn").addEventListener("click", () => {
   renderBatch();
 });
 document.getElementById("saveWeekBtn").addEventListener("click", () => {
+  let invalid = 0;
   document.querySelectorAll("#weekRows .week-row").forEach((row) => {
+    if (!row.querySelector(".wr-from")) return;
     const date = row.dataset.date;
-    const input = row.querySelector(".wr-hours");
-    const val = parseFloat(input.value);
-    if (input.value.trim() === "" || isNaN(val) || val <= 0) return;
+    const from = row.querySelector(".wr-from").value;
+    const to = row.querySelector(".wr-to").value;
+    if (!from && !to) return;
+
+    const hours = hoursBetween(from, to);
+    if (hours === null) {
+      invalid++;
+      return;
+    }
 
     const existing = entriesForDate(date);
-    const currentSum = existing.reduce((s, e) => s + e.hours, 0);
-    if (Math.abs(val - currentSum) < 0.001) return;
+    if (existing[0]?.from === from && existing[0]?.to === to) return;
 
     const note = existing[0]?.note || "";
     removeWhere((e) => e.date === date);
     entries.push({
       id: crypto.randomUUID(),
       date,
-      hours: val,
+      from,
+      to,
+      hours,
       note,
       updatedAt: Date.now(),
     });
   });
   save();
   render();
-  renderBatch();
+  if (invalid) {
+    // Ikke tegn på nytt, så det som ble skrevet står igjen og kan rettes
+    alert(
+      `${invalid} ${invalid === 1 ? "dag" : "dager"} ble ikke lagret. Fyll inn både fra og til, og til må være etter fra.`,
+    );
+  } else {
+    renderBatch();
+  }
 });
 
 render();
+prefillTimes();
 initSync();
+initForm();
