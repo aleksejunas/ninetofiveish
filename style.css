@@ -9,9 +9,11 @@
   --accent-text: #ffffff;
   --danger: #dc2626;
   --radius: 14px;
+  color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
+    color-scheme: dark;
     --bg: #17161a;
     --surface: #211f24;
     --surface-2: #2a282e;
@@ -24,6 +26,7 @@
   }
 }
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --bg: #17161a;
   --surface: #211f24;
   --surface-2: #2a282e;
@@ -105,7 +108,6 @@ label {
 }
 input[type="date"],
 input[type="number"],
-input[type="time"],
 input[type="text"] {
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -246,12 +248,6 @@ button {
   flex-shrink: 0;
   text-align: right;
 }
-.entry .hours small {
-  display: block;
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--text-dim);
-}
 .entry .del {
   color: var(--text-dim);
   background: none;
@@ -372,17 +368,15 @@ button {
   font-size: 15px;
   font-weight: 600;
 }
-.week-row input[type="time"] {
+.week-row .time-input,
+.entry-edit .time-input {
   flex: 1;
   min-width: 0;
   width: auto;
   border-radius: 8px;
-  padding: 9px 2px;
-  font-size: 13px;
+  padding: 9px 4px;
+  font-size: 15px;
   text-align: center;
-}
-.week-row input[type="time"]::-webkit-calendar-picker-indicator {
-  display: none;
 }
 .week-row .wr-multi {
   flex: 1;
@@ -426,9 +420,65 @@ button {
   flex: 0 0 56px;
 }
 .calc-hours #calcHours {
-  padding: 11px 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
   font-size: 16px;
   font-weight: 650;
+}
+
+.entry .time-btn {
+  display: block;
+  margin-left: auto;
+  padding: 2px 0 0;
+  background: none;
+  border: none;
+  border-radius: 0;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-dim);
+}
+.entry .time-empty {
+  font-weight: 650;
+  color: var(--accent);
+}
+.entry-edit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+.entry-edit:last-child {
+  border-bottom: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+}
+.entry-edit .time-input {
+  background: var(--surface);
+}
+.entry-edit .edit-calc {
+  width: 46px;
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 650;
+  text-align: right;
+}
+.entry-edit .edit-calc.invalid {
+  color: var(--danger);
+}
+.entry-edit .edit-save {
+  flex-shrink: 0;
+  padding: 9px 12px;
+  font-size: 13px;
+}
+.entry-edit .edit-cancel {
+  flex-shrink: 0;
+  padding: 4px;
+  background: none;
+  border: none;
+  font-size: 15px;
+  color: var(--text-dim);
 }
 
 .form-panel {

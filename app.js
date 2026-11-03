@@ -20,6 +20,7 @@ const LEGACY_KEYS = ["aks-timer-entries"];
 
 let entries = load();
 let editingNoteId = null;
+let editingTimeId = null;
 
 function readKey(key) {
   const raw = localStorage.getItem(key);
@@ -124,6 +125,33 @@ function shortDate(dateStr) {
   return `${d.getDate()}.${d.getMonth() + 1}`;
 }
 
+// Tolker «1300», «13», «930», «13:00» og «13.00» som HH:MM. Egne tekstfelt i
+// stedet for type="time", som viser AM/PM etter språket på enheten.
+// Gir "" for tomt felt og null for ugyldig tid.
+function normalizeTime(value) {
+  const s = (value || "").trim();
+  if (!s) return "";
+  let h, m;
+  const parts = s.match(/^(\d{1,2})[:.,](\d{1,2})$/);
+  if (parts) {
+    [h, m] = [parts[1], parts[2]];
+  } else if (/^\d{1,2}$/.test(s)) {
+    [h, m] = [s, "0"];
+  } else if (/^\d{3,4}$/.test(s)) {
+    [h, m] = [s.slice(0, -2), s.slice(-2)];
+  } else {
+    return null;
+  }
+  if (+h > 23 || +m > 59) return null;
+  return `${h.padStart(2, "0")}:${m.padStart(2, "0")}`;
+}
+// Skriver om til HH:MM når man forlater feltet, også i felt som tegnes senere
+document.addEventListener("focusout", (ev) => {
+  if (!ev.target.matches?.(".time-input")) return;
+  const time = normalizeTime(ev.target.value);
+  if (time) ev.target.value = time;
+});
+
 // Timer mellom to klokkeslett, eller null hvis til ikke er etter fra
 function hoursBetween(from, to) {
   if (!from || !to) return null;
@@ -208,10 +236,24 @@ function render() {
           ${noteHtml}
           <div class="hours">
             ${fmt(e.hours)} t
-            ${e.from ? `<small>${escapeHtml(e.from)}–${escapeHtml(e.to)}</small>` : ""}
+            ${
+              e.from
+                ? `<button type="button" class="time-btn" data-id="${e.id}">${escapeHtml(e.from)}–${escapeHtml(e.to)}</button>`
+                : `<button type="button" class="time-btn time-empty" data-id="${e.id}">+ tid</button>`
+            }
           </div>
           <button class="del" data-id="${e.id}" aria-label="Slett">✕</button>
         </div>`;
+      if (e.id === editingTimeId) {
+        html += `
+        <div class="entry-edit" data-id="${e.id}">
+          <input type="text" class="time-input edit-from" inputmode="numeric" placeholder="fra" aria-label="Fra" value="${escapeHtml(e.from || "")}">
+          <input type="text" class="time-input edit-to" inputmode="numeric" placeholder="til" aria-label="Til" value="${escapeHtml(e.to || "")}">
+          <div class="edit-calc"></div>
+          <button type="button" class="btn-primary edit-save">Lagre</button>
+          <button type="button" class="edit-cancel" aria-label="Avbryt">✕</button>
+        </div>`;
+      }
     }
     html += "</div>";
   }
@@ -233,6 +275,58 @@ function render() {
       render();
     });
   });
+
+  list.querySelectorAll(".time-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      editingTimeId = editingTimeId === btn.dataset.id ? null : btn.dataset.id;
+      render();
+    });
+  });
+
+  const timeEditor = list.querySelector(".entry-edit");
+  if (timeEditor) {
+    const fromInput = timeEditor.querySelector(".edit-from");
+    const toInput = timeEditor.querySelector(".edit-to");
+    const calc = timeEditor.querySelector(".edit-calc");
+    const hoursNow = () =>
+      hoursBetween(normalizeTime(fromInput.value), normalizeTime(toInput.value));
+    const updateCalc = () => {
+      const hours = hoursNow();
+      calc.textContent = hours === null ? "–" : `${fmt(hours)} t`;
+      calc.classList.remove("invalid");
+    };
+    const cancel = () => {
+      editingTimeId = null;
+      render();
+    };
+    const commit = () => {
+      const hours = hoursNow();
+      if (hours === null) {
+        calc.textContent = "Ugyldig";
+        calc.classList.add("invalid");
+        return;
+      }
+      const from = normalizeTime(fromInput.value);
+      const to = normalizeTime(toInput.value);
+      entries = entries.map((e) =>
+        e.id === timeEditor.dataset.id ? touch(e, { from, to, hours }) : e,
+      );
+      editingTimeId = null;
+      save();
+      render();
+    };
+    updateCalc();
+    fromInput.focus();
+    for (const input of [fromInput, toInput]) {
+      input.addEventListener("input", updateCalc);
+      input.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter") commit();
+        if (ev.key === "Escape") cancel();
+      });
+    }
+    timeEditor.querySelector(".edit-save").addEventListener("click", commit);
+    timeEditor.querySelector(".edit-cancel").addEventListener("click", cancel);
+  }
 
   const noteInput = list.querySelector(".note-input");
   if (noteInput) {
@@ -310,11 +404,14 @@ document.getElementById("date").value = todayStr();
 function updateCalcHours() {
   const fromInput = document.getElementById("from");
   const toInput = document.getElementById("to");
-  const hours = hoursBetween(fromInput.value, toInput.value);
-  const bothSet = fromInput.value && toInput.value;
-  toInput.setCustomValidity(
-    bothSet && hours === null ? "Til må være etter fra" : "",
-  );
+  const from = normalizeTime(fromInput.value);
+  const to = normalizeTime(toInput.value);
+  const hours = hoursBetween(from, to);
+  fromInput.setCustomValidity(from === null ? "Ugyldig klokkeslett" : "");
+  let toError = "";
+  if (to === null) toError = "Ugyldig klokkeslett";
+  else if (from && to && hours === null) toError = "Til må være etter fra";
+  toInput.setCustomValidity(toError);
   document.getElementById("calcHours").textContent =
     hours === null ? "–" : `${fmt(hours)} t`;
 }
@@ -335,27 +432,43 @@ function prefillTimes() {
 document.getElementById("entryForm").addEventListener("submit", (ev) => {
   ev.preventDefault();
   const date = document.getElementById("date").value;
-  const from = document.getElementById("from").value;
-  const to = document.getElementById("to").value;
+  const from = normalizeTime(document.getElementById("from").value);
+  const to = normalizeTime(document.getElementById("to").value);
   const hours = hoursBetween(from, to);
   const note = document.getElementById("note").value.trim();
   if (!date || hours === null) return;
 
-  entries.push({
-    id: crypto.randomUUID(),
-    date,
-    from,
-    to,
-    hours,
-    note,
-    updatedAt: Date.now(),
-  });
-  save();
-  render();
+  // Samme dato og timer som en vakt uten klokkeslett er den samme vakten, så
+  // den fylles ut i stedet for å telles dobbelt
+  const untimed = entriesForDate(date).find(
+    (e) => !e.from && e.hours === hours,
+  );
+  if (untimed) {
+    const before = entries;
+    entries = entries.map((e) =>
+      e.id === untimed.id
+        ? touch(e, { from, to, note: note || e.note })
+        : e,
+    );
+    save();
+    render();
+    showUndo("Klokkeslett lagt til på vakten", before);
+  } else {
+    entries.push({
+      id: crypto.randomUUID(),
+      date,
+      from,
+      to,
+      hours,
+      note,
+      updatedAt: Date.now(),
+    });
+    save();
+    render();
+  }
 
   document.getElementById("note").value = "";
   document.getElementById("date").value = todayStr();
-  document.getElementById("from").focus();
 });
 
 document.getElementById("exportBtn").addEventListener("click", () => {
@@ -472,8 +585,8 @@ function updateWeekTotal() {
   document.querySelectorAll("#weekRows .week-row").forEach((row) => {
     const hours =
       hoursBetween(
-        row.querySelector(".wr-from")?.value,
-        row.querySelector(".wr-to")?.value,
+        normalizeTime(row.querySelector(".wr-from")?.value),
+        normalizeTime(row.querySelector(".wr-to")?.value),
       ) ?? entriesForDate(row.dataset.date).reduce((s, e) => s + e.hours, 0);
     row.querySelector(".wr-sum").textContent = hours > 0 ? `${fmt(hours)} t` : "";
     sum += hours;
@@ -500,8 +613,8 @@ function renderBatch() {
       const fields =
         existing.length > 1
           ? `<div class="wr-multi">${existing.length} vakter</div>`
-          : `<input type="time" class="wr-from" aria-label="Fra" value="${escapeHtml(only?.from || "")}">
-             <input type="time" class="wr-to" aria-label="Til" value="${escapeHtml(only?.to || "")}">`;
+          : `<input type="text" class="time-input wr-from" inputmode="numeric" placeholder="fra" aria-label="Fra" value="${escapeHtml(only?.from || "")}">
+             <input type="text" class="time-input wr-to" inputmode="numeric" placeholder="til" aria-label="Til" value="${escapeHtml(only?.to || "")}">`;
       return `
       <div class="week-row${date === today ? " is-today" : ""}" data-date="${date}">
         <div class="wr-date">
@@ -559,30 +672,36 @@ document.getElementById("saveWeekBtn").addEventListener("click", () => {
   document.querySelectorAll("#weekRows .week-row").forEach((row) => {
     if (!row.querySelector(".wr-from")) return;
     const date = row.dataset.date;
-    const from = row.querySelector(".wr-from").value;
-    const to = row.querySelector(".wr-to").value;
-    if (!from && !to) return;
+    const fromInput = row.querySelector(".wr-from");
+    const toInput = row.querySelector(".wr-to");
+    if (!fromInput.value.trim() && !toInput.value.trim()) return;
 
+    const from = normalizeTime(fromInput.value);
+    const to = normalizeTime(toInput.value);
     const hours = hoursBetween(from, to);
     if (hours === null) {
       invalid++;
       return;
     }
 
-    const existing = entriesForDate(date);
-    if (existing[0]?.from === from && existing[0]?.to === to) return;
+    const [only] = entriesForDate(date);
+    if (only?.from === from && only?.to === to) return;
 
-    const note = existing[0]?.note || "";
-    removeWhere((e) => e.date === date);
-    entries.push({
-      id: crypto.randomUUID(),
-      date,
-      from,
-      to,
-      hours,
-      note,
-      updatedAt: Date.now(),
-    });
+    if (only) {
+      entries = entries.map((e) =>
+        e.id === only.id ? touch(e, { from, to, hours }) : e,
+      );
+    } else {
+      entries.push({
+        id: crypto.randomUUID(),
+        date,
+        from,
+        to,
+        hours,
+        note: "",
+        updatedAt: Date.now(),
+      });
+    }
   });
   save();
   render();

@@ -116,7 +116,7 @@ function renderFormPanel() {
   const missing = items.filter((e) => !e.from).length;
   if (missing) {
     warnings.push(
-      `${missing} ${missing === 1 ? "vakt mangler" : "vakter mangler"} klokkeslett. Fyll inn fra og til under «Uke».`,
+      `${missing} ${missing === 1 ? "vakt mangler" : "vakter mangler"} klokkeslett. Trykk «+ tid» på vakten i listen.`,
     );
   }
   const perDay = new Map();

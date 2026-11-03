@@ -242,7 +242,7 @@ function applyRemote(merged) {
   entries = merged;
   saveLocal();
   // Ikke tegn på nytt midt i redigering – da forsvinner det brukeren skriver
-  if (editingNoteId === null) render();
+  if (editingNoteId === null && editingTimeId === null) render();
   const batchView = document.getElementById("batchView");
   if (
     batchView.style.display !== "none" &&
